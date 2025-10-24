@@ -31,7 +31,7 @@
 
       <div class="mb-3">
         <label class="form-label">Monto a pagar</label>
-        <input type="number" class="form-control" id="monto" placeholder="Ej: 1000">
+        <input type="number" class="form-control" id="monto" placeholder="Ej: 2700">
       </div>
 
       <div class="mb-3">
@@ -49,12 +49,12 @@
 
     <div class="panel-box error" id="pago-rechazado" style="display:none;">
       <h5>Pago Rechazado</h5>
-      <p>Pago no válido</p>
+      <p>El monto ingresado es incorrecto</p>
     </div>
 
     <div class="panel-box warning" id="error-conexion" style="display:none;">
       <h5>Error de Conexión</h5>
-      <p>Error de conexión, intente nuevamente</p>
+      <p>No se pudo completar la transacción</p>
     </div>
 
     <div class="panel-box warning" id="validando" style="display:none;">
@@ -65,41 +65,85 @@
   </div>
 
   <script>
+
+    class Pago {
+      constructor(cliente, correo, monto, transaccion, montoEsperado = 2700) {
+        this.cliente = cliente;
+        this.correo = correo;
+        this.monto = parseFloat(monto);
+        this.transaccion = transaccion;
+        this.montoEsperado = parseFloat(montoEsperado);
+        this.estado = "pendiente";
+      }
+
+      validarDatos() {
+        return this.cliente && this.correo && this.monto && this.transaccion;
+      }
+
+      procesarPago() {
+        if (!this.validarDatos()) {
+          return { status: "error", mensaje: "Faltan datos del pago" };
+        }
+
+        // Monto incorrecto → rechazo
+        if (this.monto !== this.montoEsperado) {
+          this.estado = "rechazado";
+          return { status: "rechazado", mensaje: "Monto incorrecto: pago rechazado" };
+        }
+
+        // Caso exitoso
+        this.estado = "exitoso";
+        return { status: "ok", mensaje: "Pago exitoso" };
+      }
+    }
+
+
     const btnPagar = document.getElementById('btnPagar');
+    let timeoutError = null;
 
     btnPagar.addEventListener('click', () => {
-      // Ocultar todos los mensajes
+      // Ocultar todos los paneles
       document.getElementById('pago-exitoso').style.display = 'none';
       document.getElementById('pago-rechazado').style.display = 'none';
       document.getElementById('error-conexion').style.display = 'none';
       document.getElementById('validando').style.display = 'none';
 
-      // Leer los datos ingresados
+      if (timeoutError) {
+        clearTimeout(timeoutError);
+        timeoutError = null;
+      }
+
+      const cliente = document.getElementById('nombre').value.trim();
       const correo = document.getElementById('correo').value.trim();
       const monto = document.getElementById('monto').value.trim();
       const transaccion = document.getElementById('transaccion').value.trim();
+      const montoEsperado = 2700;
 
-      if(correo === "" || monto === "" || transaccion === "") {
-        alert("Completa todos los campos");
+      const pago = new Pago(cliente, correo, monto, transaccion, montoEsperado);
+      const resultado = pago.procesarPago();
+
+      if (resultado.status === "error") {
+        alert(resultado.mensaje);
         return;
       }
 
-      if(correo === "cliente@example.com" && monto === "1000" && transaccion === "111111") {
-        // Escenario 1: Pago exitoso
+      if (resultado.status === "ok") {
         document.getElementById('pago-exitoso').style.display = 'block';
-      } else if(correo === "rechazo@example.com") {
-        // Escenario 2: Pago rechazado
+      } 
+      else if (resultado.status === "rechazado") {
         document.getElementById('pago-rechazado').style.display = 'block';
-      } else if(correo === "errorconexion@example.com") {
-        // Escenario 3: Error de conexión (timeout 5 minutos)
+        // Iniciar timeout de 15 segundos → mostrar Error de Conexión
+        timeoutError = setTimeout(() => {
+          document.getElementById('pago-rechazado').style.display = 'none';
+          document.getElementById('error-conexion').style.display = 'block';
+        }, 15000);
+      } 
+      else if (resultado.status === "validando") {
         document.getElementById('validando').style.display = 'block';
-        setTimeout(() => {
+        timeoutError = setTimeout(() => {
           document.getElementById('validando').style.display = 'none';
           document.getElementById('error-conexion').style.display = 'block';
-        }, 300000); // 300000ms = 5 minutos
-      } else {
-        // Default a exitoso
-        document.getElementById('pago-exitoso').style.display = 'block';
+        }, 15000);
       }
     });
   </script>
